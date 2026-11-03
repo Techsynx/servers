@@ -20,6 +20,7 @@
 // The extension is served on 2026-07-28 only. The 2025-11-25 revision had its
 // own, different task methods in the core protocol; they are not served.
 
+import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import {
   CLIENT_CAPABILITIES_META_KEY,
@@ -39,11 +40,7 @@ export const TASKS_EXTENSION = "io.modelcontextprotocol/tasks";
 
 /** The status of a task. */
 export type TaskStatus =
-  | "working"
-  | "input_required"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  "working" | "input_required" | "completed" | "failed" | "cancelled";
 
 /**
  * The client's answers to a task's input requests, by key, as the SDK hands
@@ -413,7 +410,7 @@ export function registerTasksExtension(server: McpServer): void {
           outstanding.includes(key),
         ),
       );
-      const size = JSON.stringify(answered).length;
+      const size = Buffer.byteLength(JSON.stringify(answered), "utf8");
       if (size > MAX_ANSWER_BYTES) {
         throw new ProtocolError(
           ProtocolErrorCode.InvalidParams,
