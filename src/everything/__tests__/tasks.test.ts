@@ -210,6 +210,35 @@ describe("the extension", () => {
     expect(Object.keys(task.inputRequests as object)).toEqual(["sampling-1"]);
   });
 
+  it("refuses non-ASCII answers that exceed MAX_ANSWER_BYTES in UTF-8 bytes", async () => {
+    peer = await rawClient({ ...TASKS, sampling: {} });
+    const created = await peer.call("trigger-sampling-request-async", {
+      prompt: "p",
+    });
+    // Each 'é' character is 2 bytes in UTF-8 but 1 code unit in string length.
+    // 33_000 'é' characters is ~66_000 bytes, which exceeds MAX_ANSWER_BYTES (65_536).
+    const nonAsciiText = "é".repeat(33_000);
+    const response = await peer.request("tasks/update", {
+      taskId: created.taskId,
+      inputResponses: {
+        "sampling-1": {
+          role: "assistant",
+          model: "m",
+          content: { type: "text", text: nonAsciiText },
+        },
+      },
+    });
+    expect(response.error).toMatchObject({
+      code: -32602,
+      message: expect.stringContaining(
+        `over the ${MAX_ANSWER_BYTES}-byte limit; the task is unchanged`,
+      ),
+    });
+    const task = await peer.get(created.taskId as string);
+    expect(task.status).toBe("input_required");
+    expect(Object.keys(task.inputRequests as object)).toEqual(["sampling-1"]);
+  });
+
   it("refuses tasks/update without inputResponses with -32602", async () => {
     peer = await rawClient(TASKS);
     const created = await peer.call("simulate-research-query", { topic: "t" });
